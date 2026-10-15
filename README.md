@@ -10,15 +10,23 @@
 
 ## The Problem
 
-Your company has embraced AI. There was an all-hands. There was a slide with a rocket on it. Everybody now has Claude.
+Your company has embraced AI. There was an all-hands. There was a slide with a rocket on it. Now everybody has Claude.
 
-Everybody also has a monthly budget. And that budget is perfectly reasonable, right up until Tuesday at 10:47, when Claude reads your entire monorepo "just to get some context", refactors three services you didn't ask about, and writes a 400-line test suite for a function that returns `true`.
+And suddenly you're productive. *Really* productive. Features that used to take three days are done before lunch. You refactor legacy code, write tests, try out new ideas, and on the side you finally start those three projects you always wanted to build.
 
-By Wednesday you are back to typing code with your own fingers, like it's 2023.
+You're in the flow. Claude is in the flow. For the first time ever, the roadmap looks achievable.
 
-Nobody did anything wrong. You were productive. Claude was thorough. Finance was correct. It's just that *productive*, *thorough* and *correct* together add up to *out of tokens on the 3rd*.
+Then comes Wednesday.
 
-**Austerity fixes this** by applying the one management technique that has never failed: spreading a fixed amount of money evenly across the month and saying "no" a lot.
+**"You have reached your usage limit."**
+
+The monthly budget is gone. On day three. You have 27 days ahead of you and a level of productivity that, unfortunately, now has to come entirely from yourself again.
+
+Nobody did anything wrong. You delivered. Claude delivered. Management is getting its features. The budget was just calculated for a world where you ship one feature a day, not ten.
+
+**Austerity fixes this** with the most proven management technique of all time: take a fixed budget, spread it across the month, and make sure nobody spends all the money on day one.
+
+Because if AI makes you ten times more productive, it's only fair to spread that productivity evenly across the month.
 
 ## What It Does
 
