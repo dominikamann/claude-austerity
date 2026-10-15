@@ -22,11 +22,9 @@ Then comes Wednesday.
 
 The monthly budget is gone. On day three. You have 27 days ahead of you and a level of productivity that, unfortunately, now has to come entirely from yourself again.
 
-Nobody did anything wrong. You delivered. Claude delivered. Management is getting its features. The budget was just calculated for a world where you ship one feature a day, not ten.
+Nobody did anything wrong. You delivered. Claude delivered. Management is getting its features.
 
 **Austerity fixes this** with the most proven management technique of all time: take a fixed budget, spread it across the month, and make sure nobody spends all the money on day one.
-
-Because if AI makes you ten times more productive, it's only fair to spread that productivity evenly across the month.
 
 ## What It Does
 
