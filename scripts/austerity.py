@@ -879,6 +879,29 @@ def write_settings(settings):
     os.replace(tmp, SETTINGS_PATH)
 
 
+def cmd_enforce(value=None):
+    load_config()
+    cfg = read_json(CONFIG_PATH, {})
+    if value is None:
+        state = "ON. Budget rules apply." if cfg.get("enforce", True) else \
+            "OFF. You are operating under the Honor System™."
+        print("Enforcement is %s" % state)
+        return
+    if value not in ("on", "off"):
+        raise SystemExit("Please choose 'on' or 'off'. The committee does not accept 'maybe'.")
+    cfg["enforce"] = value == "on"
+    write_json(CONFIG_PATH, cfg)
+    now = dt.datetime.now().astimezone()
+    if cfg["enforce"]:
+        log_shame(now, "Enforcement re-enabled. Redemption arc started.")
+        print("Enforcement is ON again. Thank you for choosing fiscal responsibility. Controlling is visibly moved.")
+    else:
+        log_shame(now, "Enforcement disabled. Honor System™ activated.")
+        print("Enforcement is OFF. You are now operating under the Honor System™.")
+        print("Austerity will keep counting, but no longer says no. Controlling has been informed that we trust you.")
+        print("This decision has been recorded in SHAME.log for the annual review.")
+
+
 def cmd_config():
     cfg = load_config()
     print("Config file: %s" % CONFIG_PATH)
@@ -892,6 +915,7 @@ USAGE = """austerity %s — Management-Confirmed Token Usage Distributor
   standup-facts            the numbers behind the standup
   request-increase         file a budget increase request
   set-budget <usd>         set the monthly budget
+  enforce [on|off]         turn blocking on or off (shows the state without argument)
   config                   show config path and values
   statusline               one-line status for Claude Code's status line
   install-statusline [--force]   add the status line to ~/.claude/settings.json
@@ -921,6 +945,8 @@ def main(argv):
         cmd_set_budget(argv[2])
     elif cmd == "install-statusline":
         cmd_install_statusline(force="--force" in argv)
+    elif cmd == "enforce":
+        cmd_enforce(argv[2].lower() if len(argv) > 2 else None)
     elif cmd == "config":
         cmd_config()
     else:

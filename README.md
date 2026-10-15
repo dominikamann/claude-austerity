@@ -87,6 +87,7 @@ The number is your monthly budget in USD. If you leave it out, you'll be asked f
 | `/austerity:standup` | Your daily token standup, in fluent corporate |
 | `/austerity:request-budget-increase <business case>` | Formal request to the Budget Committee |
 | `/austerity:setup [usd]` | Set the budget and install the status line |
+| `/austerity:enforce on\|off` | Turn blocking on or off. Off = Honor System™ (logged, obviously) |
 
 All commands keep working when your budget is gone. Bureaucracy never sleeps.
 
@@ -140,7 +141,7 @@ allowance    = fair share × overtime multiplier (capped at what's left this mon
 It's satire that happens to work. The budget math is real, the blocking is real, and the Budget Committee is as real as any budget committee.
 
 **Can I just turn it off?**
-Yes: `/plugin disable austerity`, or set `"enforce": false`. We trust you. Controlling has been informed that we trust you.
+Yes: `/austerity:enforce off`, or `/plugin disable austerity`. We trust you. Controlling has been informed that we trust you.
 
 **What if Austerity crashes?**
 It fails open: every hook catches its own errors and lets Claude continue. Like most budget policies.
