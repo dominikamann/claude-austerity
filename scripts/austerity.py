@@ -455,21 +455,43 @@ BLOCK_HINTS = [
     "Rubber ducks are fully pre-approved and require no tokens.",
 ]
 
+# Reasons for /austerity:request-budget-increase. Claude builds a letter
+# around the one that is drawn, so every reply reads differently.
 REJECTIONS = [
-    "Unfortunately the Budget Committee is out of office until the next fiscal year.",
-    "Your request was carefully reviewed and filed in the appropriate folder.",
-    "We love the energy. We just don't love the invoice.",
-    "Please resubmit with a business case, three quotes and a slide deck (16:9).",
-    "The request is valid but conflicts with Q4 cost initiative 'Project Frugal'.",
-    "Approval requires sign-off from two managers and a full moon.",
-    "Request denied. The token tree does not grow on its own. We checked.",
-    "Thank you. Your request is important to us and will be treated as such.",
+    "You are currently far too productive. To protect the organization from uncontrolled velocity, we cannot release additional tokens at this time.",
+    "We were unable to follow your business case. It is too optimistic, too well-founded and contains no buzzwords at all, which made the committee suspicious.",
+    "Your business case shows a positive ROI. Our approval process is not designed for that. Please resubmit with a negative ROI so it can be approved like every other project.",
+    "Your output has exceeded the organization's capacity to review it. Please slow down so code review can catch up (estimated: Q3 of next year).",
+    "The Budget Committee approved your request, but the Committee for Reviewing Budget Committee Decisions did not.",
+    "Our AI-based approval tool ran out of tokens while evaluating your request.",
+    "All available tokens are reserved for the upcoming AI strategy presentation, which explains how important it is that everyone uses AI more.",
+    "Your request was submitted outside the official request window (every second Tuesday, 09:00–09:05, leap years only).",
+    "You have already delivered this quarter's roadmap. Further productivity would create expectations the organization cannot sustain long-term.",
+    "Your business case is missing the mandatory slide with a rocket on it.",
+    "We opened your business case in Excel. Excel crashed. The committee is treating this as a vote against.",
+    "Unfortunately, \"it would make me faster\" is not a recognized business reason. \"It would make us look innovative in the press release\" would have been.",
+    "The committee was so impressed by your request that it scheduled a workshop to discuss the impression. Results are expected next fiscal year.",
+    "If you finish everything this month, there will be nothing left for next month's OKRs. Please think of the OKRs.",
+    "The request does not reference a cost center, and the cost center does not reference a request. The committee cannot resolve this paradox.",
+    "Granting more tokens would make it difficult to explain to the board why we are also hiring more people.",
+    "Your request was reviewed with great care, approved in principle, and denied in practice.",
+    "The current savings initiative is going so well that it has its own budget, which has unfortunately been used up.",
 ]
 
 PENDING = [
     "Your request has been forwarded to the Budget Committee, which meets on the 32nd of each month.",
-    "Your request is now in review. Current queue position: 4,182.",
-    "Your request requires an alignment meeting. Please find a slot in everyone's calendar.",
+    "Your request is now in review. Current queue position: 4,182. Estimated waiting time: yes.",
+    "Your request requires an alignment meeting with 14 stakeholders. The first slot that works for everyone is after the next reorg.",
+    "Your request has been converted into a ticket. Status: Backlog. Priority: Medium, which is corporate for 'never'.",
+    "Your request needs a signature from a stakeholder nobody has seen since the last reorg. The search is ongoing.",
+    "Your request has been escalated, de-escalated, and re-escalated. It is currently in an escalation loop and doing well.",
+]
+
+APPROVALS = [
+    "Approved due to a clerical error. Please don't tell anyone.",
+    "Approved, because the committee's quarterly target included 'approve at least one thing'.",
+    "Approved. The committee was in a good mood after the team event. This will not happen again.",
+    "Approved, as a one-time exception that will be cited as precedent forever.",
 ]
 
 WARNINGS = [
@@ -804,16 +826,19 @@ def cmd_request_increase():
     if book["approvals"] < 2 and roll < 0.07:
         book["approvals"] += 1
         book["approved_usd"] += 2.5
-        outcome = ("APPROVED. +$2.50 has been added to this month's budget "
-                   "(one coffee-equivalent). Please use it responsibly.")
+        decision = "APPROVED: +$2.50 added to this month's budget (one coffee-equivalent)"
+        reason = rng.choice(APPROVALS)
     elif roll < 0.30:
-        outcome = "PENDING. " + rng.choice(PENDING)
+        decision = "PENDING"
+        reason = rng.choice(PENDING)
     else:
-        outcome = "DENIED. " + rng.choice(REJECTIONS)
+        decision = "DENIED"
+        reason = rng.choice(REJECTIONS)
     write_json(LEDGER_PATH, ledger)
-    print("Request #%d this month" % book["requests"])
-    print(outcome)
-    print("Approval rate this month: %d of %d" % (book["approvals"], book["requests"]))
+    print("Decision: %s" % decision)
+    print("Reason: %s" % reason)
+    print("Request number this month: %d" % book["requests"])
+    print("Approvals this month: %d of %d" % (book["approvals"], book["requests"]))
 
 
 def cmd_set_budget(value):
