@@ -835,6 +835,7 @@ def cmd_request_increase():
         decision = "DENIED"
         reason = rng.choice(REJECTIONS)
     write_json(LEDGER_PATH, ledger)
+    log_shame(now, "Begged the Budget Committee for more tokens. Outcome: %s" % decision.split(":")[0])
     print("Decision: %s" % decision)
     print("Reason: %s" % reason)
     print("Request number this month: %d" % book["requests"])
@@ -902,6 +903,55 @@ def cmd_enforce(value=None):
         print("This decision has been recorded in SHAME.log for the annual review.")
 
 
+SHAME_VERDICTS = [
+    (0, "Spotless record. Controlling suspects you are using a different laptop."),
+    (2, "Minor infractions. Nothing a team lunch can't fix."),
+    (5, "Your file has been moved to the thicker folder."),
+    (10, "You have been nominated for 'Most Innovative Use of Emergency Procedures'."),
+    (float("inf"), "HR would like to schedule a 'quick chat'. It will not be quick."),
+]
+
+
+SHAME_COMMENTS = [
+    "Controlling has read this log. Twice. With a highlighter.",
+    "This log will be presented at the next all-hands, anonymized but not very well.",
+    "Please reflect on your choices. Reflection is free and requires no tokens.",
+    "A printed copy has been placed in the shared folder named 'Lessons Learned'.",
+    "Your entries have been forwarded to the Budget Committee as reading material for its next meeting on the 32nd.",
+]
+
+
+def cmd_shame():
+    try:
+        with open(SHAME_LOG, "r", encoding="utf-8") as f:
+            entries = [l.rstrip("\n") for l in f if l.strip()]
+    except OSError:
+        entries = []
+    month = dt.datetime.now().strftime("%Y-%m")
+    this_month = [e for e in entries if e.startswith(month)]
+    print("🔔 WALK OF SHAME 🔔")
+    print("")
+    if entries:
+        for e in entries[-20:]:
+            print(e)
+        if len(entries) > 20:
+            print("… and %d earlier entries, archived for eternity." % (len(entries) - 20))
+    else:
+        print("(empty)")
+    print("")
+    print("Entries this month: %d · all time: %d" % (len(this_month), len(entries)))
+    for limit, verdict in SHAME_VERDICTS:
+        if len(this_month) <= limit:
+            print("Verdict: %s" % verdict)
+            break
+    if this_month:
+        print("")
+        print("🔔 Shame. 🔔 Shame. 🔔 Shame.")
+        print(random.choice(SHAME_COMMENTS))
+    print("")
+    print("Records cannot be deleted, only archived. (%s)" % SHAME_LOG)
+
+
 def cmd_config():
     cfg = load_config()
     print("Config file: %s" % CONFIG_PATH)
@@ -916,6 +966,7 @@ USAGE = """austerity %s — Management-Confirmed Token Usage Distributor
   request-increase         file a budget increase request
   set-budget <usd>         set the monthly budget
   enforce [on|off]         turn blocking on or off (shows the state without argument)
+  shame                    the walk of shame (SHAME.log)
   config                   show config path and values
   statusline               one-line status for Claude Code's status line
   install-statusline [--force]   add the status line to ~/.claude/settings.json
@@ -947,6 +998,8 @@ def main(argv):
         cmd_install_statusline(force="--force" in argv)
     elif cmd == "enforce":
         cmd_enforce(argv[2].lower() if len(argv) > 2 else None)
+    elif cmd == "shame":
+        cmd_shame()
     elif cmd == "config":
         cmd_config()
     else:

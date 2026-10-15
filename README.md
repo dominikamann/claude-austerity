@@ -39,6 +39,17 @@ Nobody did anything wrong. You delivered. Claude delivered. Management is gettin
 
 ## Install
 
+### Quick install
+
+```
+/plugin marketplace add dominikamann/claude-austerity
+/plugin install austerity@claude-austerity
+/austerity:setup 20
+/austerity:enforce off
+```
+
+In plain words: add the marketplace, install the plugin, set a monthly budget of $20, and switch to the Honor System™. Austerity then counts, comments and judges, but never blocks. Leave out the last line if you'd like Management to actually say "no". If the `/austerity:` commands don't show up yet, restart Claude Code after the install.
+
 ### The easy way
 
 Paste this into Claude Code:
@@ -87,6 +98,7 @@ The number is your monthly budget in USD. If you leave it out, you'll be asked f
 | `/austerity:standup` | Your daily token standup, in fluent corporate |
 | `/austerity:request-budget-increase <business case>` | Formal request to the Budget Committee |
 | `/austerity:setup [usd]` | Set the budget and install the status line |
+| `/austerity:walk-of-shame` | Read your `SHAME.log`: emergency overrides, disabled enforcement, begging. 🔔 |
 | `/austerity:enforce on\|off` | Turn blocking on or off. Off = Honor System™ (logged, obviously) |
 
 All commands keep working when your budget is gone. Bureaucracy never sleeps.
