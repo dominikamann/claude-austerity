@@ -1,10 +1,18 @@
 {
   "name": "austerity",
-  "description": "The Management-Confirmed Token Usage Distributor. Spreads your monthly Claude budget evenly across the month, blocks you when today's share is gone, and rewards overtime with extra tokens.",
+  "description": "💼 The Management-Confirmed Token Usage Distributor. Spreads your Claude budget evenly across the month, says 'no' a lot, and rewards overtime with extra tokens. Fiscally responsible AI-assisted development.",
   "version": "1.0.0",
   "author": {
     "name": "Dominik Amann"
   },
   "license": "MIT",
-  "keywords": ["budget", "cost", "tokens", "usage", "hooks", "statusline", "satire"]
+  "keywords": [
+    "budget",
+    "cost",
+    "tokens",
+    "usage",
+    "hooks",
+    "statusline",
+    "satire"
+  ]
 }

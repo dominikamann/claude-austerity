@@ -472,6 +472,44 @@ PENDING = [
     "Your request requires an alignment meeting. Please find a slot in everyone's calendar.",
 ]
 
+WARNINGS = [
+    "Friendly reminder from Controlling: {pct}% of today's tokens are already productive.",
+    "{pct}% used. This is a great moment to ask yourself: do I really need Claude for this, or do I just enjoy its company?",
+    "{pct}% of today's budget used. Claude has been asked to keep it short. Claude has agreed. Briefly.",
+    "{pct}% used. Please keep all further prompts lean, agile and under budget.",
+    "Heads-up: {pct}% of today's runway is behind us. Fasten your seatbelts and close unused tabs.",
+]
+
+GREETINGS_CORE = [
+    "Welcome back. Your token allowance has been pre-approved and is ready for responsible use.",
+    "Good to see you. Today's productivity has been budgeted in advance.",
+    "Session opened. Controlling has been notified and wishes you a fiscally sound day.",
+]
+
+GREETINGS_OVERTIME = [
+    "Working after hours? Your commitment has been noted and rewarded.",
+    "Overtime detected. The extra tokens are our way of saying 'please go home'.",
+    "Burning the midnight oil? Burning extra tokens is now officially approved.",
+]
+
+GREETINGS_WEEKEND = [
+    "Weekend shift detected. Double tokens. Single life.",
+    "Working on a weekend? Management will mention this in your review. Positively, probably.",
+    "Welcome to the weekend shift. The budget is doubled, the coffee is not.",
+]
+
+GREETINGS_BROKE = [
+    "Welcome back. Your budget for today has already been fully invested in the future.",
+    "Session opened in read-only mode for your wallet. Commands still work, ambitions do not.",
+]
+
+REPORT_FOOTERS = [
+    "This report was produced at zero token cost. You're welcome.",
+    "No tokens were harmed in the making of this report.",
+    "Please print this report and file it in the appropriate folder.",
+    "Remember: every token saved today is a token saved today.",
+]
+
 STANDUP_YESTERDAY = [
     "leveraged AI-driven synergies to move the needle",
     "aligned cross-functionally with the language model",
@@ -502,7 +540,7 @@ def format_report(s, cfg):
         lines.append("Bonus       ×%.1f %s active. Dedication pays. Literally."
                      % (s["multiplier"], s["bonus_label"]))
     else:
-        lines.append("Bonus       none (core hours). Overtime unlocks ×%.1f after %d:00."
+        lines.append("Bonus       none (core hours). Overtime unlocks ×%.1f after %d:00. Just saying."
                      % (1 + cfg["overtime_bonus"], cfg["core_hours_end"]))
     if s["approved_bonus"]:
         lines.append("Approved    +%s via official request process" % money(s["approved_bonus"]))
@@ -512,6 +550,8 @@ def format_report(s, cfg):
         "Controlling %s %s" % (emoji, mood_text),
         "",
     ]
+    lines.append(random.choice(REPORT_FOOTERS))
+    lines.append("")
     if s["source"] == "official":
         age = max(0, int((dt.datetime.now().timestamp() - s["official_at"]) / 60))
         lines.append("Month: official spend limit reported by Claude Code (%d min ago)." % age)
@@ -598,8 +638,9 @@ def hook_prompt():
 
     if s["state"] == "warn":
         emit({
-            "systemMessage": "💼 Austerity: %d%% of today's allowance used (%s / %s)."
-            % (pct(s["ratio"]), money(s["spent_today"]), money(s["allowance"])),
+            "systemMessage": "💼 %s (%s / %s)" % (
+                random.Random(s["today"] + str(pct(s["ratio"]))).choice(WARNINGS).format(pct=pct(s["ratio"])),
+                money(s["spent_today"]), money(s["allowance"])),
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
                 "additionalContext": (
@@ -649,9 +690,17 @@ def hook_session():
         pass
     now, cfg, ledger, s = current_status()
     left = max(0.0, s["allowance"] - s["spent_today"])
-    msg = "💼 Austerity: %s available today" % money(left)
+    if s["state"] in ("exhausted", "bankrupt"):
+        pool = GREETINGS_BROKE
+    elif s["bonus_label"] == "weekend bonus":
+        pool = GREETINGS_WEEKEND
+    elif s["bonus_label"]:
+        pool = GREETINGS_OVERTIME
+    else:
+        pool = GREETINGS_CORE
+    msg = "💼 %s %s available today" % (random.choice(pool), money(left))
     if s["bonus_label"]:
-        msg += " (incl. %s ×%.1f, thank you for your commitment)" % (s["bonus_label"], s["multiplier"])
+        msg += " (incl. ×%.1f %s)" % (s["multiplier"], s["bonus_label"])
     msg += " · month %s / %s" % (money(s["spent_month"]), money(s["monthly"]))
     emit({"systemMessage": msg})
 
@@ -698,22 +747,52 @@ def cmd_report():
     print(format_report(s, cfg))
 
 
-def cmd_standup():
-    now, _cfg, _ledger, s = current_status()
-    rng = random.Random(s["today"])
+def spent_yesterday(now, cfg):
+    """Yesterday's spend, or None if yesterday was in another month."""
     yesterday = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-    days = scan_usage(now, max_age_s=60)
-    spent_yesterday = days.get(yesterday, 0.0) if yesterday[:7] == s["today"][:7] else None
+    if yesterday[:7] != now.strftime("%Y-%m"):
+        return None
+    days = scan_usage(now, cfg.get("prices"), max_age_s=60)
+    return days.get(yesterday, 0.0) * cfg["price_multiplier"]
+
+
+def cmd_standup():
+    now, cfg, _ledger, s = current_status()
+    rng = random.Random(s["today"])
+    spent_yesterday_usd = spent_yesterday(now, cfg)
     print("DAILY TOKEN STANDUP · %s" % s["today"])
     print("")
-    if spent_yesterday is None:
+    if spent_yesterday_usd is None:
         print("Yesterday: belongs to a closed fiscal period. We don't talk about it.")
     else:
-        print("Yesterday: %s. Invested %s." % (rng.choice(STANDUP_YESTERDAY), money(spent_yesterday)))
+        print("Yesterday: %s. Invested %s." % (rng.choice(STANDUP_YESTERDAY), money(spent_yesterday_usd)))
     print("Today: deliver value within an approved envelope of %s (%d%% consumed)."
           % (money(s["allowance"]), pct(s["ratio"])))
     print(STANDUP_BLOCKERS[s["state"]])
     print("Burn rate vs. fair share: %s" % bar(s["ratio"]))
+
+
+def cmd_standup_facts():
+    """Plain numbers for the /austerity:standup command to write about."""
+    now, cfg, _ledger, s = current_status()
+    y = spent_yesterday(now, cfg)
+    facts = [
+        ("date", "%s (%s)" % (s["today"], now.strftime("%A"))),
+        ("spent_yesterday", "previous month, closed fiscal period" if y is None else money(y)),
+        ("spent_today", money(s["spent_today"])),
+        ("allowance_today", money(s["allowance"])),
+        ("used_today", "%d%%" % pct(s["ratio"])),
+        ("spent_month", "%s of %s" % (money(s["spent_month"]), money(s["monthly"]))),
+        ("days_left_in_month", s["remaining_days"]),
+        ("state", {"ok": "on track", "warn": "almost out for today",
+                   "exhausted": "out of budget for today",
+                   "bankrupt": "monthly budget used up"}[s["state"]]),
+        ("bonus", s["bonus_label"] or "none (core hours)"),
+        ("emergency_overrides_this_month", s["incidents"]),
+        ("controlling_mood", "%s %s" % mood(s["ratio"])),
+    ]
+    for key, value in facts:
+        print("%s: %s" % (key, value))
 
 
 def cmd_request_increase():
@@ -745,7 +824,8 @@ def cmd_set_budget(value):
     cfg = read_json(CONFIG_PATH, {})
     cfg["monthly_budget_usd"] = amount
     write_json(CONFIG_PATH, cfg)
-    print("Monthly budget set to %s. Config: %s" % (money(amount), CONFIG_PATH))
+    print("Monthly budget set to %s. The Budget Committee has approved this number without reading it." % money(amount))
+    print("Config: %s" % CONFIG_PATH)
 
 
 def cmd_install_statusline(force=False):
@@ -784,6 +864,7 @@ USAGE = """austerity %s — Management-Confirmed Token Usage Distributor
 
   report                   budget report
   standup                  daily standup in corporate speak
+  standup-facts            the numbers behind the standup
   request-increase         file a budget increase request
   set-budget <usd>         set the monthly budget
   config                   show config path and values
@@ -807,6 +888,8 @@ def main(argv):
         cmd_report()
     elif cmd == "standup":
         cmd_standup()
+    elif cmd == "standup-facts":
+        cmd_standup_facts()
     elif cmd == "request-increase":
         cmd_request_increase()
     elif cmd == "set-budget" and len(argv) > 2:
