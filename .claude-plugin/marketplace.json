@@ -1,0 +1,18 @@
+{
+  "name": "claude-austerity",
+  "description": "Fiscally responsible AI-assisted development.",
+  "owner": {
+    "name": "Dominik Amann"
+  },
+  "plugins": [
+    {
+      "name": "austerity",
+      "description": "The Management-Confirmed Token Usage Distributor. Spreads your monthly Claude budget evenly across the month, blocks you when today's share is gone, and rewards overtime with extra tokens.",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "Dominik Amann"
+      }
+    }
+  ]
+}
