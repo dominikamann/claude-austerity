@@ -8,7 +8,7 @@
     {
       "name": "austerity",
       "description": "💼 The Management-Confirmed Token Usage Distributor. Spreads your Claude budget evenly across the month, says 'no' a lot, and rewards overtime with extra tokens. Fiscally responsible AI-assisted development.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./",
       "author": {
         "name": "Dominik Amann"
