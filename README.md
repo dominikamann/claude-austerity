@@ -38,7 +38,7 @@ The monthly budget is gone. On day three. You have 27 days ahead of you and a le
 
 Nobody did anything wrong. You delivered. Claude delivered. The budget was simply planned for a month, not for three days.
 
-**Austerity fixes this** with a proven technique: take a fixed budget, spread it across the month, and make sure nobody spends all of it on day one.
+**Austerity fixes this** with the most proven management technique of all time: take a fixed budget, spread it across the month, and make sure nobody spends all the money on day one.
 
 ## What It Does
 
