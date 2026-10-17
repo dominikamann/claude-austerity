@@ -45,7 +45,7 @@ Nobody did anything wrong. You delivered. Claude delivered. The budget was simpl
 - 📊 **Tracks your real usage.** It reads Claude Code's local session transcripts and prices every message.
 - 🧾 **Uses the official numbers when it can.** If Claude Code reports a spend limit (Enterprise and Team plans with usage limits), Austerity uses the server's numbers for the month. Otherwise it uses your configured budget and an estimate.
 - 📅 **Distributes the budget dynamically.** Today's allowance = what's left ÷ days left in the month. Saving today means more tomorrow. Spending today means a tighter tomorrow. It's like a household budget, but for vibes.
-- 🌙 **Rewards overtime.** Outside core hours (9–5) your allowance grows by 50%. On weekends it doubles. The bonus comes out of your own future budget, so it's really just borrowing from yourself.
+- 🌙 **Rewards overtime.** Outside core hours (9–5) your allowance grows by 50%. On weekends it doubles. Commitment is noticed. Commitment is incentivized. The incentive comes out of your own future budget, which is also how real incentives work.
 - 🙏 **Asks Claude to be concise** once you hit 80% of today's allowance. Claude gets a polite note to use fewer tool calls and shorter answers.
 - 🛑 **Blocks prompts** at 100%, with a friendly message from Management. If the budget runs out mid-task, Claude is asked to summarize and stop.
 - 🚨 **Has an emergency exit.** Start a prompt with `PROD IS DOWN` to bypass the budget for 30 minutes. It is logged in `SHAME.log`, just in case production goes down suspiciously often near the end of the month.
