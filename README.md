@@ -6,11 +6,25 @@
 > "Please don't use up the whole budget on the first day."
 > — every budget meeting, ever
 
+```
+💼 $1.20/$1.88 ▰▰▰▰▰▱▱▱ · month $11.20/$25.00 ✓ · Controlling 🙂
+```
+
+## Why You Might Actually Want This
+
+AI is quickly becoming part of everyday work. The hard part is no longer *whether* to use it, but keeping the costs transparent and weighing them against the business case. Austerity helps with that, right where you work:
+
+- **You always know what's left.** The status line shows how much of your monthly budget is still available.
+- **You know how to get through the month.** Your remaining budget is spread over the remaining days, so you see what you can spend today without running dry next week.
+- **You know what you used today.** A daily number is a lot easier to reason about than one big invoice at the end of the month.
+
+That part is meant seriously. Everything else in this repo (Controlling's mood, the Budget Committee, the walk of shame) is gentle satire about a situation many teams know well.
+
 ---
 
 ## The Problem
 
-Your company has embraced AI. There was an all-hands. There was a slide with a rocket on it. Now everybody has Claude.
+Your company has embraced AI. Now everybody has Claude.
 
 And suddenly you're productive. *Really* productive. Features that used to take three days are done before lunch. You refactor legacy code, write tests, try out new ideas, and on the side you finally start those three projects you always wanted to build.
 
@@ -22,20 +36,20 @@ Then comes Wednesday.
 
 The monthly budget is gone. On day three. You have 27 days ahead of you and a level of productivity that, unfortunately, now has to come entirely from yourself again.
 
-Nobody did anything wrong. You delivered. Claude delivered. Management is getting its features.
+Nobody did anything wrong. You delivered. Claude delivered. The budget was simply planned for a month, not for three days.
 
-**Austerity fixes this** with the most proven management technique of all time: take a fixed budget, spread it across the month, and make sure nobody spends all the money on day one.
+**Austerity fixes this** with a proven technique: take a fixed budget, spread it across the month, and make sure nobody spends all of it on day one.
 
 ## What It Does
 
 - 📊 **Tracks your real usage.** It reads Claude Code's local session transcripts and prices every message.
 - 🧾 **Uses the official numbers when it can.** If Claude Code reports a spend limit (Enterprise and Team plans with usage limits), Austerity uses the server's numbers for the month. Otherwise it uses your configured budget and an estimate.
 - 📅 **Distributes the budget dynamically.** Today's allowance = what's left ÷ days left in the month. Saving today means more tomorrow. Spending today means a tighter tomorrow. It's like a household budget, but for vibes.
-- 🌙 **Rewards overtime.** Outside core hours (9–5) your allowance grows by 50%. On weekends it doubles. Commitment is noticed. Commitment is incentivized. The incentive comes out of your own future budget, which is also how real incentives work.
+- 🌙 **Rewards overtime.** Outside core hours (9–5) your allowance grows by 50%. On weekends it doubles. The bonus comes out of your own future budget, so it's really just borrowing from yourself.
 - 🙏 **Asks Claude to be concise** once you hit 80% of today's allowance. Claude gets a polite note to use fewer tool calls and shorter answers.
 - 🛑 **Blocks prompts** at 100%, with a friendly message from Management. If the budget runs out mid-task, Claude is asked to summarize and stop.
-- 🚨 **Has an emergency exit.** Start a prompt with `PROD IS DOWN` to bypass the budget for 30 minutes. It is logged in `SHAME.log`. Controlling will notice if production goes down suspiciously often near the end of the month.
-- 📝 **Has an approval process.** `/austerity:request-budget-increase` submits a formal request to the Budget Committee. It's a real process with real outcomes, mostly the other kind.
+- 🚨 **Has an emergency exit.** Start a prompt with `PROD IS DOWN` to bypass the budget for 30 minutes. It is logged in `SHAME.log`, just in case production goes down suspiciously often near the end of the month.
+- 📝 **Has an approval process.** `/austerity:request-budget-increase` submits a formal request to the Budget Committee. The approval rate is low, but the replies are always polite.
 
 ## Install
 
@@ -44,11 +58,11 @@ Nobody did anything wrong. You delivered. Claude delivered. Management is gettin
 ```
 /plugin marketplace add dominikamann/claude-austerity
 /plugin install austerity@claude-austerity
-/austerity:setup 20
+/austerity:setup 25
 /austerity:enforce off
 ```
 
-In plain words: add the marketplace, install the plugin, set a monthly budget of $20, and switch to the Honor System™. Austerity then counts, comments and judges, but never blocks. Leave out the last line if you'd like Management to actually say "no". If the `/austerity:` commands don't show up yet, restart Claude Code after the install.
+In plain words: add the marketplace, install the plugin, set a monthly budget of $25, and switch to the Honor System™. Austerity then counts, comments and judges, but never blocks. Leave out the last line if you'd like Management to actually say "no". If the `/austerity:` commands don't show up yet, restart Claude Code after the install.
 
 ### The easy way
 
@@ -70,7 +84,7 @@ Claude has been very eager to cut its own budget ever since we told it about thi
 Restart Claude Code, then run:
 
 ```
-/austerity:setup 20
+/austerity:setup 25
 ```
 
 The number is your monthly budget in USD. If you leave it out, you'll be asked for it; the default is $20. Setup also installs the status line, which is where the official spend limit comes from.
@@ -80,14 +94,14 @@ The number is your monthly budget in USD. If you leave it out, you'll be asked f
 ## The Status Line
 
 ```
-💼 $0.84/$1.18 ▰▰▰▰▰▰▱▱ · month $11.20/$20.00 ✓ · 🌙 ×1.5 overtime bonus · Controlling 🙂
+💼 $1.20/$1.88 ▰▰▰▰▰▱▱▱ · month $11.20/$25.00 ✓ · Controlling 🙂
 ```
 
 | Part | Meaning |
 |---|---|
-| `$0.84/$1.18` | spent today / approved for today |
-| `month $11.20/$20.00 ✓` | monthly spend; ✓ = official numbers from Claude Code |
-| `🌙 ×1.5` | overtime or weekend bonus is active |
+| `$1.20/$1.88` | spent today / approved for today |
+| `month $11.20/$25.00 ✓` | monthly spend; ✓ = official numbers from Claude Code |
+| `🌙 ×1.5` | shown only while an overtime or weekend bonus is active |
 | `Controlling 😌🙂😬🧯` | how Controlling feels about all of this |
 
 ## Commands
@@ -150,13 +164,13 @@ allowance    = fair share × overtime multiplier (capped at what's left this mon
 ## FAQ
 
 **Is this a joke?**
-It's satire that happens to work. The budget math is real, the blocking is real, and the Budget Committee is as real as any budget committee.
+It's satire that happens to work. The budget math is real and the blocking is real. The Budget Committee is the satirical part.
 
 **Can I just turn it off?**
 Yes: `/austerity:enforce off`, or `/plugin disable austerity`. We trust you. Controlling has been informed that we trust you.
 
 **What if Austerity crashes?**
-It fails open: every hook catches its own errors and lets Claude continue. Like most budget policies.
+It fails open: every hook catches its own errors and lets Claude continue.
 
 **Does it send my data anywhere?**
 No. It reads local files, writes local files and has no network code. Saving money starts with not paying for a backend.
@@ -168,7 +182,7 @@ It's priced from the token counts in your transcripts at public list prices, so 
 It's 7%, with at most two approvals per month. That's generous, industry-wise.
 
 **My manager found this repo.**
-Great! Show them the status line. It's basically a cost-control dashboard. You're welcome.
+Great! Show them the status line. It's a small cost-transparency dashboard, and it's exactly the kind of number that makes AI business cases easier to discuss.
 
 ## Development
 
@@ -180,7 +194,7 @@ AUSTERITY_HOME=/tmp/aus python3 scripts/austerity.py report
 
 ## Disclaimer
 
-This project makes fun of a process, not of people. Budgets are reasonable. Managers are people too, and most of them also wish they had more tokens. No Budget Committee was harmed in the making of this plugin, mainly because we never managed to get a meeting with it.
+This project pokes fun at a situation, not at people or any particular company. Budgets are reasonable, and so is asking what AI costs and what it brings in return. Managers and controllers are doing a genuinely hard job here, and most of them also wish they had more tokens. No Budget Committee was harmed in the making of this plugin.
 
 Not affiliated with Anthropic. Claude is a trademark of Anthropic.
 
