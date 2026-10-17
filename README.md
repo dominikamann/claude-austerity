@@ -18,7 +18,7 @@ AI is quickly becoming part of everyday work. The hard part is no longer *whethe
 - **You know how to get through the month.** Your remaining budget is spread over the remaining days, so you see what you can spend today without running dry next week.
 - **You know what you used today.** A daily number is a lot easier to reason about than one big invoice at the end of the month.
 
-That part is meant seriously. Everything else in this repo (Controlling's mood, the Budget Committee, the walk of shame) is gentle satire about a situation many teams know well.
+That part is meant seriously. Everything else in this repo (Controlling's mood, the Budget Committee, the walk of shame) is satire about a situation many teams know well.
 
 ---
 
@@ -164,13 +164,13 @@ allowance    = fair share × overtime multiplier (capped at what's left this mon
 ## FAQ
 
 **Is this a joke?**
-It's satire that happens to work. The budget math is real and the blocking is real. The Budget Committee is the satirical part.
+It's satire that happens to work. The budget math is real, the blocking is real, and the Budget Committee is as real as any budget committee.
 
 **Can I just turn it off?**
 Yes: `/austerity:enforce off`, or `/plugin disable austerity`. We trust you. Controlling has been informed that we trust you.
 
 **What if Austerity crashes?**
-It fails open: every hook catches its own errors and lets Claude continue.
+It fails open: every hook catches its own errors and lets Claude continue. Like most budget policies.
 
 **Does it send my data anywhere?**
 No. It reads local files, writes local files and has no network code. Saving money starts with not paying for a backend.
@@ -182,7 +182,7 @@ It's priced from the token counts in your transcripts at public list prices, so 
 It's 7%, with at most two approvals per month. That's generous, industry-wise.
 
 **My manager found this repo.**
-Great! Show them the status line. It's a small cost-transparency dashboard, and it's exactly the kind of number that makes AI business cases easier to discuss.
+Great! Show them the status line. It's a small cost-transparency dashboard, and it's exactly the kind of number that makes AI business cases easier to discuss. You're welcome.
 
 ## Development
 
@@ -194,7 +194,7 @@ AUSTERITY_HOME=/tmp/aus python3 scripts/austerity.py report
 
 ## Disclaimer
 
-This project pokes fun at a situation, not at people or any particular company. Budgets are reasonable, and so is asking what AI costs and what it brings in return. Managers and controllers are doing a genuinely hard job here, and most of them also wish they had more tokens. No Budget Committee was harmed in the making of this plugin.
+This project pokes fun at a situation, not at people or any particular company. Budgets are reasonable, and so is asking what AI costs and what it brings in return. Managers and controllers have a hard job here, and most of them also wish they had more tokens. No Budget Committee was harmed in the making of this plugin, mainly because we never managed to get a meeting with it.
 
 Not affiliated with Anthropic. Claude is a trademark of Anthropic.
 
