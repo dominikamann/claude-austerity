@@ -104,6 +104,8 @@ The number is your monthly budget in USD. If you leave it out, you'll be asked f
 | `🌙 ×1.5` | shown only while an overtime or weekend bonus is active |
 | `Controlling 😌🙂😬🧯` | how Controlling feels about all of this |
 
+The numbers cover all your sessions, not just the current one. Every open session refreshes its status line every 15 seconds, so spending in one window shows up in the others too.
+
 ## Commands
 
 | Command | What it does |

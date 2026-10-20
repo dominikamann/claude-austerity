@@ -128,6 +128,18 @@ class OfficialTest(unittest.TestCase):
         self.assertIsNone(austerity.load_official(at(15, 10).replace(month=11), CFG))
         self.assertIsNone(austerity.load_official(now, dict(CFG, budget_source="config")))
 
+    def test_stale_session_does_not_overwrite_newer_spend(self):
+        now = at(15, 10)
+        fresh = {"rate_limits": {"spend_limit": {"used_usd": 14.0, "limit_usd": 20}}}
+        stale = {"rate_limits": {"spend_limit": {"used_usd": 9.0, "limit_usd": 20}}}
+        austerity.record_official(now, fresh)
+        austerity.record_official(now, stale)
+        self.assertEqual(austerity.load_official(now, CFG)["used_usd"], 14.0)
+        # A new month starts from zero again.
+        november = at(15, 10).replace(month=11)
+        austerity.record_official(november, stale)
+        self.assertEqual(austerity.load_official(november, CFG)["used_usd"], 9.0)
+
     def test_payload_without_spend_limit_is_ignored(self):
         austerity.record_official(at(15, 10), {"rate_limits": {"five_hour": {"used_percentage": 3}}})
         self.assertFalse(os.path.exists(austerity.OFFICIAL_PATH))
@@ -177,6 +189,36 @@ class ScanTest(unittest.TestCase):
         with open(os.path.join(self.dir, "c.jsonl"), "a") as f:
             f.write(full[40:] + "\n")
         self.assertAlmostEqual(sum(austerity.scan_usage(now).values()), 0.02)
+
+
+class StatuslineSettingsTest(unittest.TestCase):
+    def setUp(self):
+        if os.path.exists(austerity.SETTINGS_PATH):
+            os.remove(austerity.SETTINGS_PATH)
+
+    def write_settings(self, statusline):
+        with open(austerity.SETTINGS_PATH, "w") as f:
+            json.dump({"statusLine": statusline}, f)
+
+    def read_statusline(self):
+        with open(austerity.SETTINGS_PATH) as f:
+            return json.load(f)["statusLine"]
+
+    def test_install_sets_refresh_interval(self):
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            austerity.cmd_install_statusline()
+        self.assertEqual(self.read_statusline()["refreshInterval"], austerity.STATUSLINE_REFRESH_S)
+
+    def test_old_install_gets_refresh_interval(self):
+        command = 'python3 "%s" statusline' % austerity.STATUSLINE_COPY
+        self.write_settings({"type": "command", "command": command, "padding": 0})
+        austerity.upgrade_statusline_settings()
+        self.assertEqual(self.read_statusline()["refreshInterval"], austerity.STATUSLINE_REFRESH_S)
+
+    def test_foreign_statusline_is_left_alone(self):
+        self.write_settings({"type": "command", "command": "my-own-line"})
+        austerity.upgrade_statusline_settings()
+        self.assertNotIn("refreshInterval", self.read_statusline())
 
 
 class HookTest(unittest.TestCase):

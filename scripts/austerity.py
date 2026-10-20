@@ -17,6 +17,11 @@ import random
 import sys
 import tempfile
 
+try:
+    import fcntl
+except ImportError:  # Windows: no locking, last writer wins.
+    fcntl = None
+
 VERSION = "1.1.0"
 
 # --------------------------------------------------------------------------
@@ -29,11 +34,15 @@ HOME = os.environ.get("AUSTERITY_HOME") or os.path.join(CLAUDE_DIR, "austerity")
 CONFIG_PATH = os.path.join(HOME, "config.json")
 LEDGER_PATH = os.path.join(HOME, "ledger.json")
 CACHE_PATH = os.path.join(HOME, "cache.json")
+LOCK_PATH = os.path.join(HOME, ".lock")
 SHAME_LOG = os.path.join(HOME, "SHAME.log")
 OFFICIAL_PATH = os.path.join(HOME, "official.json")
 # Stable copy for the status line (plugin paths change with every update).
 STATUSLINE_COPY = os.path.join(HOME, "austerity.py")
 SETTINGS_PATH = os.path.join(CLAUDE_DIR, "settings.json")
+# Idle sessions only redraw the status line on their own events. Re-run it
+# regularly so spend from other sessions shows up everywhere.
+STATUSLINE_REFRESH_S = 15
 
 # --------------------------------------------------------------------------
 # Config
@@ -105,6 +114,26 @@ def write_json(path, data):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(tmp, path)
+
+
+class home_lock:
+    """Exclusive lock across all running sessions (no-op without fcntl)."""
+
+    def __enter__(self):
+        self.f = None
+        if fcntl is None:
+            return self
+        try:
+            ensure_home()
+            self.f = open(LOCK_PATH, "a")
+            fcntl.flock(self.f, fcntl.LOCK_EX)
+        except OSError:
+            self.f = None
+        return self
+
+    def __exit__(self, *exc):
+        if self.f:
+            self.f.close()
 
 
 def load_config():
@@ -210,7 +239,14 @@ def scan_usage(now, overrides=None, max_age_s=0):
 
     Files are parsed incrementally from the last known offset. With max_age_s,
     a recent result is reused without touching the transcripts at all.
+    Parallel sessions share one cache, so the scan runs under a lock: otherwise
+    a slower process could overwrite a newer result with an older one.
     """
+    with home_lock():
+        return _scan_usage(now, overrides, max_age_s)
+
+
+def _scan_usage(now, overrides, max_age_s):
     month_key = now.strftime("%Y-%m")
     cache = read_json(CACHE_PATH, {})
     if cache.get("version") != 2 or cache.get("month") != month_key:
@@ -299,7 +335,12 @@ def override_active(ledger, now):
 
 
 def record_official(now, statusline_input):
-    """Remember rate_limits.spend_limit from the status line payload."""
+    """Remember rate_limits.spend_limit from the status line payload.
+
+    Every session reports the numbers from its own last API response, so an
+    idle session sends stale values. Spend never drops within a month: a lower
+    used_usd than the one on file is outdated and ignored.
+    """
     limits = (statusline_input or {}).get("rate_limits") or {}
     spend = limits.get("spend_limit") or {}
     used, limit = spend.get("used_usd"), spend.get("limit_usd")
@@ -307,7 +348,14 @@ def record_official(now, statusline_input):
         return
     data = {"month": now.strftime("%Y-%m"), "used_usd": float(used),
             "limit_usd": float(limit), "at": now.timestamp()}
+    with home_lock():
+        _record_official(now, data)
+
+
+def _record_official(now, data):
     old = read_json(OFFICIAL_PATH, {})
+    if old.get("month") == data["month"] and data["used_usd"] < old.get("used_usd", 0):
+        return
     unchanged = all(old.get(k) == data[k] for k in ("month", "used_usd", "limit_usd"))
     if unchanged and now.timestamp() - old.get("at", 0) < 300:
         return
@@ -704,10 +752,21 @@ def sync_statusline_copy():
         f.write(new)
 
 
+def upgrade_statusline_settings():
+    """Add refreshInterval to status lines installed by older versions."""
+    settings = read_json(SETTINGS_PATH, None)
+    line = (settings or {}).get("statusLine") or {}
+    if STATUSLINE_COPY not in (line.get("command") or "") or line.get("refreshInterval"):
+        return
+    line["refreshInterval"] = STATUSLINE_REFRESH_S
+    write_settings(settings)
+
+
 def hook_session():
     read_hook_input()
     try:
         sync_statusline_copy()
+        upgrade_statusline_settings()
     except OSError:
         pass
     now, cfg, ledger, s = current_status()
@@ -867,7 +926,8 @@ def cmd_install_statusline(force=False):
         print("EXISTING_STATUSLINE: %s" % json.dumps(existing))
         print("Not changed. Re-run with --force to replace it.")
         return
-    settings["statusLine"] = {"type": "command", "command": command, "padding": 0}
+    settings["statusLine"] = {"type": "command", "command": command, "padding": 0,
+                              "refreshInterval": STATUSLINE_REFRESH_S}
     write_settings(settings)
     print("Status line installed: %s" % command)
 
