@@ -23,7 +23,7 @@ try:
 except ImportError:  # Windows: no locking, last writer wins.
     fcntl = None
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # --------------------------------------------------------------------------
 # Paths
