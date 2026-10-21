@@ -400,7 +400,8 @@ def budget_status(now, cfg, days, ledger, official=None):
         source = "official"
     else:
         monthly = cfg["monthly_budget_usd"] + book["approved_usd"]
-        spent_month = sum(days.values()) * mult
+        # Manual correction from /austerity:calibrate, booked before today.
+        spent_month = sum(days.values()) * mult + book.get("correction_usd", 0.0)
         source = "estimate"
     left_before_today = max(0.0, monthly - max(0.0, spent_month - spent_today))
 
@@ -436,6 +437,7 @@ def budget_status(now, cfg, days, ledger, official=None):
         "spent_month": spent_month,
         "monthly": monthly,
         "approved_bonus": book["approved_usd"],
+        "correction": book.get("correction_usd", 0.0) if not official else 0.0,
         "remaining_days": remaining_days,
         "multiplier": multiplier,
         "bonus_label": bonus_label,
@@ -614,6 +616,9 @@ def format_report(s, cfg):
                      % (1 + cfg["overtime_bonus"], cfg["core_hours_end"]))
     if s["approved_bonus"]:
         lines.append("Approved    +%s via official request process" % money(s["approved_bonus"]))
+    if s["correction"]:
+        lines.append("Correction  %s%s via manual calibration"
+                     % ("+" if s["correction"] > 0 else "-", money(abs(s["correction"]))))
     if s["incidents"]:
         lines.append("Incidents   %d emergency override(s) this month" % s["incidents"])
     lines += [
@@ -901,6 +906,33 @@ def cmd_request_increase():
     print("Approvals this month: %d of %d" % (book["approvals"], book["requests"]))
 
 
+def cmd_calibrate(value):
+    """Set this month's spend to the real figure (e.g. from the invoice)."""
+    now = dt.datetime.now().astimezone()
+    cfg = load_config()
+    estimate = sum(scan_usage(now, cfg.get("prices")).values()) * cfg["price_multiplier"]
+    ledger = load_ledger()
+    book = month_book(ledger, now)
+    if value == "reset":
+        book["correction_usd"] = 0.0
+        write_json(LEDGER_PATH, ledger)
+        print("Correction removed. Back to the estimate: %s this month." % money(estimate))
+        return
+    actual = float(value)
+    if actual < 0:
+        raise SystemExit("Spend can't be negative. Controlling checked twice.")
+    book["correction_usd"] = actual - estimate
+    write_json(LEDGER_PATH, ledger)
+    log_shame(now, "Books corrected manually: %s instead of the estimated %s."
+              % (money(actual), money(estimate)))
+    print("Month corrected: %s (estimate %s, correction %s%s)."
+          % (money(actual), money(estimate),
+             "+" if actual >= estimate else "-", money(abs(actual - estimate))))
+    print("The correction stays for this month; new usage is added on top.")
+    if load_official(now, cfg):
+        print("Note: Claude Code reports official numbers right now, and those take precedence over the correction.")
+
+
 def cmd_set_budget(value):
     amount = float(value)
     if amount <= 0:
@@ -1025,6 +1057,7 @@ USAGE = """austerity %s — Management-Confirmed Token Usage Distributor
   standup-facts            the numbers behind the standup
   request-increase         file a budget increase request
   set-budget <usd>         set the monthly budget
+  calibrate <usd>|reset    correct this month's spend to the real figure
   enforce [on|off]         turn blocking on or off (shows the state without argument)
   shame                    the walk of shame (SHAME.log)
   config                   show config path and values
@@ -1052,6 +1085,8 @@ def main(argv):
         cmd_standup_facts()
     elif cmd == "request-increase":
         cmd_request_increase()
+    elif cmd == "calibrate" and len(argv) > 2:
+        cmd_calibrate(argv[2].lower())
     elif cmd == "set-budget" and len(argv) > 2:
         cmd_set_budget(argv[2])
     elif cmd == "install-statusline":

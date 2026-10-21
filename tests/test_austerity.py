@@ -100,6 +100,23 @@ class BudgetTest(unittest.TestCase):
         s = austerity.budget_status(at(15, 10), CFG, {}, ledger)
         self.assertAlmostEqual(s["monthly"], 22.5)
 
+    def test_correction_counts_before_today(self):
+        ledger = {"months": {"2026-10": {"approved_usd": 0.0, "requests": 0, "approvals": 0,
+                                         "incidents": 0, "correction_usd": 5.0}}}
+        s = austerity.budget_status(at(15, 10), CFG, {"2026-10-15": 1.0}, ledger)
+        self.assertAlmostEqual(s["spent_month"], 6.0)
+        self.assertAlmostEqual(s["spent_today"], 1.0)
+        # 20 - 5 = 15 left before today, spread over 17 days
+        self.assertAlmostEqual(s["fair_share"], 15.0 / 17)
+
+    def test_official_numbers_ignore_correction(self):
+        ledger = {"months": {"2026-10": {"approved_usd": 0.0, "requests": 0, "approvals": 0,
+                                         "incidents": 0, "correction_usd": 5.0}}}
+        official = {"month": "2026-10", "used_usd": 30.0, "limit_usd": 50.0, "at": 0}
+        s = austerity.budget_status(at(15, 10), CFG, {}, ledger, official)
+        self.assertAlmostEqual(s["spent_month"], 30.0)
+        self.assertEqual(s["correction"], 0.0)
+
     def test_allowance_never_exceeds_month_left(self):
         s = austerity.budget_status(at(31, 22), CFG, {"2026-10-01": 19.0}, empty_ledger())
         self.assertAlmostEqual(s["allowance"], 1.0)
@@ -189,6 +206,36 @@ class ScanTest(unittest.TestCase):
         with open(os.path.join(self.dir, "c.jsonl"), "a") as f:
             f.write(full[40:] + "\n")
         self.assertAlmostEqual(sum(austerity.scan_usage(now).values()), 0.02)
+
+
+class CalibrateTest(unittest.TestCase):
+    def setUp(self):
+        for p in (austerity.LEDGER_PATH, austerity.CACHE_PATH, austerity.OFFICIAL_PATH):
+            if os.path.exists(p):
+                os.remove(p)
+
+    def month_spend(self):
+        with mock.patch.object(austerity, "scan_usage", return_value={"2026-10-01": 248.0}):
+            return austerity.current_status(now=at(15, 10))[3]["spent_month"]
+
+    def calibrate(self, value):
+        fake_dt = mock.Mock(wraps=dt.datetime)
+        fake_dt.now.return_value = at(15, 10)
+        with mock.patch.object(austerity, "scan_usage", return_value={"2026-10-01": 248.0}), \
+                mock.patch.object(austerity.dt, "datetime", fake_dt), \
+                mock.patch.object(sys, "stdout", io.StringIO()):
+            austerity.cmd_calibrate(value)
+
+    def test_calibrate_sets_month_to_actual_and_reset_undoes_it(self):
+        self.calibrate("300")
+        self.assertAlmostEqual(self.month_spend(), 300.0)
+        self.calibrate("reset")
+        self.assertAlmostEqual(self.month_spend(), 248.0)
+
+    def test_recalibrating_replaces_previous_correction(self):
+        self.calibrate("300")
+        self.calibrate("260")
+        self.assertAlmostEqual(self.month_spend(), 260.0)
 
 
 class StatuslineSettingsTest(unittest.TestCase):

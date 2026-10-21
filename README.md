@@ -116,6 +116,7 @@ The numbers cover all your sessions, not just the current one. Every open sessio
 | `/austerity:setup [usd]` | Set the budget and install the status line |
 | `/austerity:walk-of-shame` | Read your `SHAME.log`: emergency overrides, disabled enforcement, begging. 🔔 |
 | `/austerity:enforce on\|off` | Turn blocking on or off. Off = Honor System™ (logged, obviously) |
+| `/austerity:calibrate <usd>\|reset` | Correct this month's spend to the real figure, e.g. from your console or invoice |
 
 All commands keep working when your budget is gone. Bureaucracy never sleeps.
 
@@ -161,6 +162,8 @@ allowance    = fair share × overtime multiplier (capped at what's left this mon
 - **Monthly numbers** come from Claude Code's official spend limit when the status line has seen one. Otherwise they come from the config and local transcripts.
 - **Today's number** is always estimated from local transcripts: input, output, cache reads, 5-minute and 1-hour cache writes, and fast mode, priced at public API list prices.
 - Messages are deduplicated across sessions, so resuming a session doesn't count twice.
+- Subagents and background agents are included: each one has its own transcript next to its session.
+- The estimate can still come out lower than your real bill: usage from other machines, claude.ai or cloud sessions, and Claude Code's own small background requests never show up in local transcripts. If you know the real number, run `/austerity:calibrate 300`. From then on this month's total starts at $300 and new usage is added on top. The correction counts as spent before today, so it lowers the fair share for the remaining days, and `/austerity:calibrate reset` removes it. When Claude Code reports official numbers, those win anyway.
 - Transcripts are parsed incrementally and cached, so the hooks usually take a few dozen milliseconds.
 
 ## FAQ
