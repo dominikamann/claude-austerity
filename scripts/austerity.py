@@ -12,6 +12,7 @@ Claude keeps working. Like most budget policies.
 import calendar
 import datetime as dt
 import json
+import math
 import os
 import random
 import sys
@@ -317,6 +318,16 @@ def load_ledger():
     return read_json(LEDGER_PATH, {"months": {}, "override_until": None})
 
 
+def update_ledger(change):
+    """Read, change and write the ledger under the lock, so parallel sessions
+    can't overwrite each other's entries. Don't scan inside `change`."""
+    with home_lock():
+        ledger = load_ledger()
+        result = change(ledger)
+        write_json(LEDGER_PATH, ledger)
+    return result
+
+
 def month_book(ledger, now):
     return ledger["months"].setdefault(
         now.strftime("%Y-%m"),
@@ -387,11 +398,26 @@ def overtime(now, cfg):
     return 1.0, None
 
 
+def calibrated_month(book, raw, mult):
+    """This month's spend after /austerity:calibrate.
+
+    The calibration anchors the real figure to the raw (unmultiplied)
+    estimate at that moment; only usage after it is added on top, so a later
+    price_multiplier change can't distort what the user entered.
+    """
+    cal = book.get("calibration")
+    if cal:
+        return cal["actual_usd"] + max(0.0, raw - cal["raw_usd"]) * mult
+    # 1.2.0 stored a plain offset.
+    return raw * mult + book.get("correction_usd", 0.0)
+
+
 def budget_status(now, cfg, days, ledger, official=None):
     book = month_book(ledger, now)
     today = now.strftime("%Y-%m-%d")
     mult = cfg["price_multiplier"]
     spent_today = days.get(today, 0.0) * mult
+    correction = 0.0
     if official:
         # The server knows the real numbers for the month; today's share
         # still comes from the local transcripts.
@@ -400,9 +426,12 @@ def budget_status(now, cfg, days, ledger, official=None):
         source = "official"
     else:
         monthly = cfg["monthly_budget_usd"] + book["approved_usd"]
-        # Manual correction from /austerity:calibrate, booked before today.
-        spent_month = sum(days.values()) * mult + book.get("correction_usd", 0.0)
+        estimate = sum(days.values()) * mult
+        spent_month = calibrated_month(book, sum(days.values()), mult)
+        correction = spent_month - estimate
         source = "estimate"
+    # Today can't cost more than the whole month (e.g. after calibrating down).
+    spent_today = min(spent_today, spent_month)
     left_before_today = max(0.0, monthly - max(0.0, spent_month - spent_today))
 
     days_in_month = calendar.monthrange(now.year, now.month)[1]
@@ -437,7 +466,7 @@ def budget_status(now, cfg, days, ledger, official=None):
         "spent_month": spent_month,
         "monthly": monthly,
         "approved_bonus": book["approved_usd"],
-        "correction": book.get("correction_usd", 0.0) if not official else 0.0,
+        "correction": correction,
         "remaining_days": remaining_days,
         "multiplier": multiplier,
         "bonus_label": bonus_label,
@@ -463,6 +492,10 @@ def current_status(max_age_s=0, now=None):
 
 def money(x):
     return "$%.2f" % x
+
+
+def signed_money(x):
+    return ("-" if x < 0 else "+") + money(abs(x))
 
 
 def pct(ratio):
@@ -617,8 +650,7 @@ def format_report(s, cfg):
     if s["approved_bonus"]:
         lines.append("Approved    +%s via official request process" % money(s["approved_bonus"]))
     if s["correction"]:
-        lines.append("Correction  %s%s via manual calibration"
-                     % ("+" if s["correction"] > 0 else "-", money(abs(s["correction"]))))
+        lines.append("Correction  %s via manual calibration" % signed_money(s["correction"]))
     if s["incidents"]:
         lines.append("Incidents   %d emergency override(s) this month" % s["incidents"])
     lines += [
@@ -684,6 +716,7 @@ def log_shame(now, what):
 def hook_prompt():
     data = read_hook_input()
     prompt = (data.get("prompt") or "").strip()
+    keep_statusline_current()
     now, cfg, ledger, s = current_status()
 
     if prompt.startswith("/austerity"):
@@ -691,10 +724,12 @@ def hook_prompt():
 
     phrase = cfg["emergency_phrase"].strip().lower()
     if phrase and prompt.lower().startswith(phrase):
-        book = month_book(ledger, now)
-        book["incidents"] += 1
-        ledger["override_until"] = now.timestamp() + 60 * cfg["emergency_minutes"]
-        write_json(LEDGER_PATH, ledger)
+        def declare_incident(ledger):
+            book = month_book(ledger, now)
+            book["incidents"] += 1
+            ledger["override_until"] = now.timestamp() + 60 * cfg["emergency_minutes"]
+            return book
+        book = update_ledger(declare_incident)
         log_shame(now, "Emergency override #%d (today %s / %s)"
                   % (book["incidents"], money(s["spent_today"]), money(s["allowance"])))
         msg = ("🚨 Emergency override accepted for %d minutes. Incident #%d this month. "
@@ -727,8 +762,25 @@ def hook_prompt():
         })
 
 
+def is_own_command(data):
+    """A plain `python3 …/austerity.py <cmd>` call from one of our commands.
+
+    These must work while the budget is used up (/austerity:enforce off,
+    /austerity:calibrate), so the tool hook lets them through.
+    """
+    if data.get("tool_name") != "Bash":
+        return False
+    cmd = ((data.get("tool_input") or {}).get("command") or "").strip()
+    cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", "")
+    if not cmd.startswith("python3 ") or "austerity.py" not in cmd:
+        return False
+    return not any(c in cmd for c in ";&|`$<>\n")
+
+
 def hook_tool():
-    read_hook_input()
+    data = read_hook_input()
+    if is_own_command(data):
+        return
     now, cfg, ledger, s = current_status(max_age_s=15)
     if not cfg["enforce"] or s["override"]:
         return
@@ -753,8 +805,11 @@ def sync_statusline_copy():
     with open(STATUSLINE_COPY, "rb") as f:
         if f.read() == new:
             return
-    with open(STATUSLINE_COPY, "wb") as f:
+    # Atomic: a status line starting mid-write must never see half a file.
+    fd, tmp = tempfile.mkstemp(dir=HOME, prefix=".tmp-")
+    with os.fdopen(fd, "wb") as f:
         f.write(new)
+    os.replace(tmp, STATUSLINE_COPY)
 
 
 def upgrade_statusline_settings():
@@ -767,13 +822,19 @@ def upgrade_statusline_settings():
     write_settings(settings)
 
 
-def hook_session():
-    read_hook_input()
+def keep_statusline_current():
+    """Runs on every prompt, so a plugin update reaches the status line at
+    once, not only in the next new session (resumed ones never got it)."""
     try:
         sync_statusline_copy()
         upgrade_statusline_settings()
     except OSError:
         pass
+
+
+def hook_session():
+    read_hook_input()
+    keep_statusline_current()
     now, cfg, ledger, s = current_status()
     left = max(0.0, s["allowance"] - s["spent_today"])
     if s["state"] in ("exhausted", "bankrupt"):
@@ -882,23 +943,23 @@ def cmd_standup_facts():
 
 
 def cmd_request_increase():
-    now, cfg, ledger, s = current_status()
-    book = month_book(ledger, now)
-    book["requests"] += 1
+    now = dt.datetime.now().astimezone()
     rng = random.Random()
     roll = rng.random()
-    if book["approvals"] < 2 and roll < 0.07:
-        book["approvals"] += 1
-        book["approved_usd"] += 2.5
-        decision = "APPROVED: +$2.50 added to this month's budget (one coffee-equivalent)"
-        reason = rng.choice(APPROVALS)
-    elif roll < 0.30:
-        decision = "PENDING"
-        reason = rng.choice(PENDING)
-    else:
-        decision = "DENIED"
-        reason = rng.choice(REJECTIONS)
-    write_json(LEDGER_PATH, ledger)
+
+    def decide(ledger):
+        book = month_book(ledger, now)
+        book["requests"] += 1
+        if book["approvals"] < 2 and roll < 0.07:
+            book["approvals"] += 1
+            book["approved_usd"] += 2.5
+            return book, "APPROVED: +$2.50 added to this month's budget (one coffee-equivalent)", APPROVALS
+        if roll < 0.30:
+            return book, "PENDING", PENDING
+        return book, "DENIED", REJECTIONS
+
+    book, decision, reasons = update_ledger(decide)
+    reason = rng.choice(reasons)
     log_shame(now, "Begged the Budget Committee for more tokens. Outcome: %s" % decision.split(":")[0])
     print("Decision: %s" % decision)
     print("Reason: %s" % reason)
@@ -906,28 +967,51 @@ def cmd_request_increase():
     print("Approvals this month: %d of %d" % (book["approvals"], book["requests"]))
 
 
+def parse_amount(text):
+    """'300', '300.50', '300,50', '$300', '1,234.50 USD' -> float."""
+    cleaned = text.strip().lower()
+    for junk in ("usd", "eur", "$", "€", " "):
+        cleaned = cleaned.replace(junk, "")
+    if "," in cleaned and "." in cleaned:
+        cleaned = cleaned.replace(",", "")
+    else:
+        cleaned = cleaned.replace(",", ".")
+    try:
+        amount = float(cleaned)
+    except ValueError:
+        amount = None
+    if amount is None or not math.isfinite(amount):
+        raise SystemExit("'%s' is not an amount Controlling can book. Please use a plain number, e.g. 300 or 300.50." % text)
+    if amount < 0:
+        raise SystemExit("Spend can't be negative. Controlling checked twice.")
+    return amount
+
+
 def cmd_calibrate(value):
     """Set this month's spend to the real figure (e.g. from the invoice)."""
     now = dt.datetime.now().astimezone()
     cfg = load_config()
-    estimate = sum(scan_usage(now, cfg.get("prices")).values()) * cfg["price_multiplier"]
-    ledger = load_ledger()
-    book = month_book(ledger, now)
-    if value == "reset":
-        book["correction_usd"] = 0.0
-        write_json(LEDGER_PATH, ledger)
+    actual = None if value == "reset" else parse_amount(value)
+    # Scan outside the ledger lock: both use the same lock file.
+    raw = sum(scan_usage(now, cfg.get("prices")).values())
+    estimate = raw * cfg["price_multiplier"]
+
+    def book_it(ledger):
+        book = month_book(ledger, now)
+        book.pop("correction_usd", None)
+        if actual is None:
+            book.pop("calibration", None)
+        else:
+            book["calibration"] = {"actual_usd": actual, "raw_usd": raw}
+
+    update_ledger(book_it)
+    if actual is None:
         print("Correction removed. Back to the estimate: %s this month." % money(estimate))
         return
-    actual = float(value)
-    if actual < 0:
-        raise SystemExit("Spend can't be negative. Controlling checked twice.")
-    book["correction_usd"] = actual - estimate
-    write_json(LEDGER_PATH, ledger)
     log_shame(now, "Books corrected manually: %s instead of the estimated %s."
               % (money(actual), money(estimate)))
-    print("Month corrected: %s (estimate %s, correction %s%s)."
-          % (money(actual), money(estimate),
-             "+" if actual >= estimate else "-", money(abs(actual - estimate))))
+    print("Month corrected: %s (estimate %s, correction %s)."
+          % (money(actual), money(estimate), signed_money(actual - estimate)))
     print("The correction stays for this month; new usage is added on top.")
     if load_official(now, cfg):
         print("Note: Claude Code reports official numbers right now, and those take precedence over the correction.")
@@ -1086,7 +1170,7 @@ def main(argv):
     elif cmd == "request-increase":
         cmd_request_increase()
     elif cmd == "calibrate" and len(argv) > 2:
-        cmd_calibrate(argv[2].lower())
+        cmd_calibrate(" ".join(argv[2:]).lower())
     elif cmd == "set-budget" and len(argv) > 2:
         cmd_set_budget(argv[2])
     elif cmd == "install-statusline":

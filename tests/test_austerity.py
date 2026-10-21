@@ -100,6 +100,16 @@ class BudgetTest(unittest.TestCase):
         s = austerity.budget_status(at(15, 10), CFG, {}, ledger)
         self.assertAlmostEqual(s["monthly"], 22.5)
 
+    def test_calibrating_down_caps_today(self):
+        # Estimate $10, all of it today; the real month total is $4.
+        ledger = {"months": {"2026-10": {"approved_usd": 0.0, "requests": 0, "approvals": 0,
+                                         "incidents": 0, "calibration": {"actual_usd": 4.0, "raw_usd": 10.0}}}}
+        s = austerity.budget_status(at(15, 10), CFG, {"2026-10-15": 10.0}, ledger)
+        self.assertAlmostEqual(s["spent_month"], 4.0)
+        self.assertAlmostEqual(s["spent_today"], 4.0)
+        self.assertEqual(s["state"], "exhausted")  # $4 is still above 20/17, but no longer $10
+        self.assertAlmostEqual(s["correction"], -6.0)
+
     def test_correction_counts_before_today(self):
         ledger = {"months": {"2026-10": {"approved_usd": 0.0, "requests": 0, "approvals": 0,
                                          "incidents": 0, "correction_usd": 5.0}}}
@@ -232,6 +242,38 @@ class CalibrateTest(unittest.TestCase):
         self.calibrate("reset")
         self.assertAlmostEqual(self.month_spend(), 248.0)
 
+    def test_price_multiplier_change_keeps_the_calibrated_figure(self):
+        self.calibrate("300")
+        cfg = dict(CFG, price_multiplier=1.2)
+        with mock.patch.object(austerity, "scan_usage", return_value={"2026-10-01": 248.0}), \
+                mock.patch.object(austerity, "load_config", return_value=cfg):
+            s = austerity.current_status(now=at(15, 10))[3]
+        self.assertAlmostEqual(s["spent_month"], 300.0)
+
+    def test_only_usage_after_calibration_is_added(self):
+        self.calibrate("300")
+        with mock.patch.object(austerity, "scan_usage",
+                               return_value={"2026-10-01": 248.0, "2026-10-15": 2.0}):
+            s = austerity.current_status(now=at(15, 10))[3]
+        self.assertAlmostEqual(s["spent_month"], 302.0)
+
+    def test_old_offset_from_1_2_0_still_counts(self):
+        ledger = {"months": {"2026-10": {"approved_usd": 0.0, "requests": 0, "approvals": 0,
+                                         "incidents": 0, "correction_usd": 100.0}}}
+        austerity.write_json(austerity.LEDGER_PATH, ledger)
+        self.assertAlmostEqual(self.month_spend(), 348.0)
+        self.calibrate("300")
+        self.assertAlmostEqual(self.month_spend(), 300.0)
+
+    def test_amounts(self):
+        self.assertEqual(austerity.parse_amount("300"), 300.0)
+        self.assertEqual(austerity.parse_amount("300,50"), 300.5)
+        self.assertEqual(austerity.parse_amount("$1,234.50"), 1234.5)
+        self.assertEqual(austerity.parse_amount("300 €"), 300.0)
+        for bad in ("nan", "inf", "-5", "lots"):
+            with self.assertRaises(SystemExit):
+                austerity.parse_amount(bad)
+
     def test_recalibrating_replaces_previous_correction(self):
         self.calibrate("300")
         self.calibrate("260")
@@ -261,6 +303,14 @@ class StatuslineSettingsTest(unittest.TestCase):
         self.write_settings({"type": "command", "command": command, "padding": 0})
         austerity.upgrade_statusline_settings()
         self.assertEqual(self.read_statusline()["refreshInterval"], austerity.STATUSLINE_REFRESH_S)
+
+    def test_stale_copy_is_replaced(self):
+        os.makedirs(austerity.HOME, exist_ok=True)
+        with open(austerity.STATUSLINE_COPY, "w") as f:
+            f.write('VERSION = "0.0.1"\n')
+        austerity.keep_statusline_current()
+        with open(austerity.STATUSLINE_COPY) as f, open(austerity.__file__) as src:
+            self.assertEqual(f.read(), src.read())
 
     def test_foreign_statusline_is_left_alone(self):
         self.write_settings({"type": "command", "command": "my-own-line"})
@@ -299,6 +349,17 @@ class HookTest(unittest.TestCase):
         self.assertIn("Emergency override", res["systemMessage"])
         with open(austerity.SHAME_LOG) as f:
             self.assertIn("Emergency override", f.read())
+
+    def test_own_commands_pass_the_tool_hook(self):
+        own = {"tool_name": "Bash", "tool_input": {"command": 'python3 "/p/scripts/austerity.py" enforce off'}}
+        self.assertTrue(austerity.is_own_command(own))
+        own["tool_input"]["command"] = "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/austerity.py calibrate 300"
+        self.assertTrue(austerity.is_own_command(own))
+        for sneaky in ("python3 /p/austerity.py report; rm -rf ~", "python3 x.py && austerity.py",
+                       "python3 /p/austerity.py $(whoami)"):
+            own["tool_input"]["command"] = sneaky
+            self.assertFalse(austerity.is_own_command(own))
+        self.assertFalse(austerity.is_own_command({"tool_name": "Edit", "tool_input": {}}))
 
     def test_tool_denied_when_exhausted(self):
         with mock.patch.object(austerity, "current_status", return_value=self.status(5.0)), \
